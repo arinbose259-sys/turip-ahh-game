@@ -2,166 +2,199 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Subway Runner Web</title>
+    <title>Subway Runner: Shop & Powerups</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 30px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 10; }
-        #overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.7); 
-                   display: flex; flex-direction: column; align-items: center; justify-content: center; 
-                   color: white; cursor: pointer; z-index: 100; }
+        body { margin: 0; overflow: hidden; background: #60a5fa; font-family: 'Arial Black', sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: #fbbf24; font-size: 28px; text-shadow: 2px 2px #000; z-index: 10; }
+        #menu { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; }
+        .btn { padding: 15px 30px; font-size: 20px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 10px; }
+        .shop-item { background: #334155; padding: 15px; margin: 5px; border-radius: 8px; width: 300px; display: flex; justify-content: space-between; align-items: center; }
+        #powerup-ui { position: absolute; bottom: 20px; right: 20px; color: #4ade80; font-size: 20px; }
     </style>
 </head>
 <body>
 
-    <div id="ui">Score: <span id="score">0</span></div>
-    <div id="overlay">
-        <h1>SUBWAY RUNNER</h1>
-        <p>A/D to Switch Lanes | SPACE to Jump | S to Slide</p>
-        <button style="padding: 15px 30px; font-size: 20px; cursor: pointer;">START GAME</button>
+    <div id="ui">COINS: <span id="coin-count">0</span> | BANK: <span id="bank-total">0</span></div>
+    <div id="powerup-ui"></div>
+
+    <div id="menu">
+        <h1 style="color: #fbbf24; font-size: 50px;">SUBWAY SHOP</h1>
+        
+        <div id="shop-container">
+            <div class="shop-item">
+                <span>Speedster Skin</span>
+                <button class="btn" onclick="buyItem('char_speed', 100)">Buy (100)</button>
+            </div>
+            <div class="shop-item">
+                <span>Magnet Upgrade</span>
+                <button class="btn" onclick="buyItem('power_mag', 50)">Buy (50)</button>
+            </div>
+        </div>
+
+        <button class="btn" style="background:#22c55e" onclick="startGame()">START RUN</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        // --- SAVE SYSTEM ---
+        let bank = parseInt(localStorage.getItem('subway_bank')) || 0;
+        let unlocked = JSON.parse(localStorage.getItem('subway_unlocks')) || ['default'];
+        document.getElementById('bank-total').innerText = bank;
+
+        function buyItem(id, price) {
+            if (bank >= price && !unlocked.includes(id)) {
+                bank -= price;
+                unlocked.push(id);
+                localStorage.setItem('subway_bank', bank);
+                localStorage.setItem('subway_unlocks', JSON.stringify(unlocked));
+                document.getElementById('bank-total').innerText = bank;
+                alert("Purchased!");
+            } else {
+                alert("Not enough coins or already owned!");
+            }
+        }
+
+        // --- GAME ENGINE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.fog = new THREE.Fog(0x60a5fa, 10, 150);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(5, 20, 10);
+        scene.add(sun);
 
-        // Player Lane Logic
-        let currentLane = 0; // -1: Left, 0: Middle, 1: Right
-        const laneWidth = 3;
-        
-        // Player Model (Simple Humanoid)
-        const playerGroup = new THREE.Group();
-        const bodyMat = new THREE.MeshStandardMaterial({color: 0x3498db});
-        const playerBody = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4), bodyMat);
-        playerBody.position.y = 1;
-        playerGroup.add(playerBody);
-        const playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-        playerHead.position.y = 1.7;
-        playerGroup.add(playerHead);
-        scene.add(playerGroup);
+        let currentLane = 0;
+        const laneWidth = 3.5;
+        let vy = 0, isGrounded = true, isSliding = false;
+        let coinsCollected = 0, gameRunning = false, speed = 0.5;
+        let activePowerup = null;
 
-        // Jumping & Sliding Physics
-        let vy = 0;
-        let isGrounded = true;
-        let isSliding = false;
+        // Player Model
+        const player = new THREE.Group();
+        const bodyColor = unlocked.includes('char_speed') ? 0x9333ea : 0x3b82f6; // Purple if bought
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.5), new THREE.MeshStandardMaterial({color: bodyColor}));
+        body.position.y = 1.1;
+        player.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac}));
+        head.position.y = 1.9;
+        player.add(head);
+        scene.add(player);
 
-        // Tracks/Road
-        const roadGeo = new THREE.PlaneGeometry(10, 1000);
-        const roadMat = new THREE.MeshStandardMaterial({color: 0x333333});
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        scene.add(road);
+        const obstacles = [], coins = [], scenery = [], powerups = [];
 
-        // Obstacles
-        let obstacles = [];
-        function spawnObstacle() {
-            const type = Math.random();
-            let geo, mat, yPos;
+        function createScenery(z) {
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 100), new THREE.MeshStandardMaterial({color: 0x334155}));
+            floor.rotation.x = -Math.PI/2; floor.position.z = z; scene.add(floor); scenery.push(floor);
             
-            if (type > 0.5) { // High barrier (must slide)
-                geo = new THREE.BoxGeometry(2, 1, 0.5);
-                mat = new THREE.MeshStandardMaterial({color: 0xe74c3c});
-                yPos = 1.8;
-            } else { // Low hurdle (must jump)
-                geo = new THREE.BoxGeometry(2, 0.8, 0.5);
-                mat = new THREE.MeshStandardMaterial({color: 0xf1c40f});
-                yPos = 0.4;
-            }
-
-            const obs = new THREE.Mesh(geo, mat);
-            const lane = Math.floor(Math.random() * 3) - 1;
-            obs.position.set(lane * laneWidth, yPos, -100);
-            scene.add(obs);
-            obstacles.push(obs);
+            const b1 = new THREE.Mesh(new THREE.BoxGeometry(10, 25, 80), new THREE.MeshStandardMaterial({color: 0x64748b}));
+            b1.position.set(-20, 10, z); scene.add(b1); scenery.push(b1);
+            
+            const b2 = new THREE.Mesh(new THREE.BoxGeometry(10, 25, 80), new THREE.MeshStandardMaterial({color: 0x64748b}));
+            b2.position.set(20, 10, z); scene.add(b2); scenery.push(b2);
         }
 
-        let gameRunning = false;
-        let score = 0;
-        let speed = 0.4;
+        function spawnRow(z) {
+            const lane = Math.floor(Math.random() * 3) - 1;
+            // Spawn Powerup (Rarely)
+            if (Math.random() < 0.05) {
+                const pu = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({color: 0x4ade80, emissive: 0x4ade80}));
+                pu.position.set(lane * laneWidth, 1.5, z);
+                pu.userData = { type: 'magnet' };
+                scene.add(pu);
+                powerups.push(pu);
+            }
+            // Spawn Obstacle
+            const isTrain = Math.random() < 0.3;
+            const obs = new THREE.Mesh(
+                isTrain ? new THREE.BoxGeometry(3, 4, 12) : new THREE.BoxGeometry(3, 1, 0.5),
+                new THREE.MeshStandardMaterial({color: isTrain ? 0xef4444 : 0xf97316})
+            );
+            obs.position.set(lane * laneWidth, isTrain ? 2 : 2.5, z);
+            scene.add(obs);
+            obstacles.push(obs);
 
-        // Controls
+            // Spawn Coins
+            for(let i=0; i<3; i++) {
+                const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1), new THREE.MeshStandardMaterial({color: 0xfacc15}));
+                c.rotation.x = Math.PI/2;
+                c.position.set(lane * laneWidth, 1, z - (i*3));
+                scene.add(c);
+                coins.push(c);
+            }
+        }
+
+        for(let i=0; i<5; i++) { createScenery(-i * 100); spawnRow(-50 - (i * 40)); }
+
+        function startGame() { 
+            document.getElementById('menu').style.display = 'none'; 
+            gameRunning = true; 
+        }
+
         window.addEventListener('keydown', (e) => {
             if (!gameRunning) return;
-            if (e.key === 'a' && currentLane > -1) currentLane--;
-            if (e.key === 'd' && currentLane < 1) currentLane++;
-            if (e.key === ' ' && isGrounded) {
-                vy = 0.25;
-                isGrounded = false;
-            }
-            if (e.key === 's' && isGrounded) {
-                isSliding = true;
-                playerBody.scale.y = 0.5;
-                playerBody.position.y = 0.5;
-                setTimeout(() => {
-                    isSliding = false;
-                    playerBody.scale.y = 1;
-                    playerBody.position.y = 1;
-                }, 700);
+            const k = e.key.toLowerCase();
+            if (k === 'a' && currentLane > -1) currentLane--;
+            if (k === 'd' && currentLane < 1) currentLane++;
+            if (k === ' ' && isGrounded) { vy = 0.35; isGrounded = false; }
+            if (k === 's' && isGrounded) {
+                isSliding = true; player.scale.y = 0.4; player.position.y = -0.3;
+                setTimeout(() => { isSliding = false; player.scale.y = 1; player.position.y = 0; }, 700);
             }
         });
 
-        document.getElementById('overlay').addEventListener('click', () => {
-            document.getElementById('overlay').style.display = 'none';
-            gameRunning = true;
-        });
-
-        camera.position.set(0, 5, 8);
-        camera.lookAt(0, 0, 0);
+        camera.position.set(0, 6, 10);
+        camera.lookAt(0, 2, 0);
 
         function animate() {
             requestAnimationFrame(animate);
             if (gameRunning) {
-                score++;
-                document.getElementById('score').innerText = Math.floor(score/10);
-                speed += 0.0001; // Get faster over time
+                speed += 0.00005;
+                player.position.x += (currentLane * laneWidth - player.position.x) * 0.2;
+                player.position.y += vy;
+                if (!isGrounded) { vy -= 0.015; if (player.position.y <= 0) { player.position.y = 0; vy = 0; isGrounded = true; } }
 
-                // Smooth lane switching
-                const targetX = currentLane * laneWidth;
-                playerGroup.position.x += (targetX - playerGroup.position.x) * 0.15;
+                [...obstacles, ...coins, ...scenery, ...powerups].forEach(obj => obj.position.z += speed);
 
-                // Jump Physics
-                playerGroup.position.y += vy;
-                if (!isGrounded) {
-                    vy -= 0.01; // Gravity
-                    if (playerGroup.position.y <= 0) {
-                        playerGroup.position.y = 0;
-                        vy = 0;
-                        isGrounded = true;
+                scenery.forEach(obj => { if (obj.position.z > 80) { obj.position.z -= 500; if(obj.geometry.type === "PlaneGeometry") spawnRow(obj.position.z); } });
+
+                // Powerup Collision
+                powerups.forEach((pu, i) => {
+                    if (player.position.distanceTo(pu.position) < 1.5) {
+                        activePowerup = 'MAGNET';
+                        document.getElementById('powerup-ui').innerText = "MAGNET ACTIVE!";
+                        scene.remove(pu); powerups.splice(i, 1);
+                        setTimeout(() => { activePowerup = null; document.getElementById('powerup-ui').innerText = ""; }, 5000);
                     }
-                }
+                });
 
-                // Obstacle Management
-                if (Math.random() < 0.02) spawnObstacle();
+                // Coin Collection
+                coins.forEach((c, i) => {
+                    if (activePowerup === 'MAGNET' && c.position.z < 20) {
+                        c.position.lerp(player.position, 0.1);
+                    }
+                    if (player.position.distanceTo(c.position) < 1.5) {
+                        scene.remove(c); coins.splice(i, 1);
+                        coinsCollected++; document.getElementById('coin-count').innerText = coinsCollected;
+                    }
+                });
 
-                for (let i = obstacles.length - 1; i >= 0; i--) {
-                    obstacles[i].position.z += speed;
-
-                    // Collision Detection
-                    const playerBox = new THREE.Box3().setFromObject(playerGroup);
-                    const obsBox = new THREE.Box3().setFromObject(obstacles[i]);
-
-                    if (playerBox.intersectsBox(obsBox)) {
+                // Obstacle Collision
+                obstacles.forEach(obs => {
+                    const pBox = new THREE.Box3().setFromObject(player);
+                    const oBox = new THREE.Box3().setFromObject(obs);
+                    if (pBox.intersectsBox(oBox)) {
                         gameRunning = false;
-                        alert("CRASH! Score: " + Math.floor(score/10));
+                        bank += coinsCollected;
+                        localStorage.setItem('subway_bank', bank);
+                        alert("Game Over! Saved " + coinsCollected + " coins to your bank.");
                         location.reload();
                     }
-
-                    if (obstacles[i].position.z > 10) {
-                        scene.remove(obstacles[i]);
-                        obstacles.splice(i, 1);
-                    }
-                }
+                });
             }
             renderer.render(scene, camera);
         }
