@@ -2,228 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Subway Runner: Ultimate Edition</title>
+    <title>Subway Surfers: Neon Night</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #60a5fa; font-family: 'Arial Black', sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: #fbbf24; font-size: 28px; text-shadow: 2px 2px #000; z-index: 10; }
-        #menu { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; overflow-y: auto; }
-        .btn { padding: 15px 30px; font-size: 18px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 5px; transition: 0.2s; }
-        .btn:hover { background: #dc2626; transform: scale(1.05); }
-        .shop-item { background: #334155; padding: 12px; margin: 8px; border-radius: 8px; width: 350px; display: flex; justify-content: space-between; align-items: center; border: 2px solid #475569; }
-        #powerup-ui { position: absolute; bottom: 30px; right: 30px; color: #4ade80; font-size: 24px; font-weight: bold; }
-        .price { color: #facc15; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: #00ffcc; font-size: 28px; text-shadow: 0 0 10px #00ffcc; z-index: 10; }
+        #menu { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; }
+        .btn { padding: 15px 40px; font-size: 22px; background: #00ffcc; color: #000; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00ffcc; }
+        .shop-item { background: #111; padding: 12px; margin: 8px; border-radius: 12px; width: 350px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        #powerup-ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); color: #ff00ff; font-size: 24px; text-shadow: 0 0 15px #ff00ff; }
     </style>
 </head>
 <body>
 
-    <div id="ui">COINS: <span id="coin-count">0</span> | BANK: $<span id="bank-total">0</span></div>
+    <div id="ui">GEMS: <span id="coin-count">0</span> | BANK: $<span id="bank-total">0</span></div>
     <div id="powerup-ui"></div>
 
     <div id="menu">
-        <h1 style="color: #fbbf24; font-size: 50px; margin-bottom: 10px;">SUBWAY SHOP</h1>
-        <p>Use your starting <b>$500</b> to upgrade!</p>
-        
+        <h1 style="color: #00ffcc; font-size: 60px; margin-bottom: 5px; text-shadow: 0 0 20px #00ffcc;">NEON RUNNER</h1>
         <div id="shop-container">
-            <div class="shop-item">
-                <span>Purple Speedster</span>
-                <button class="btn" onclick="buyItem('char_purple', 250)">Buy <span class="price">$250</span></button>
-            </div>
-            <div class="shop-item">
-                <span>Gold Avatar</span>
-                <button class="btn" onclick="buyItem('char_gold', 500)">Buy <span class="price">$500</span></button>
-            </div>
-            <div class="shop-item">
-                <span>Magnet Duration+</span>
-                <button class="btn" onclick="buyItem('up_mag', 150)">Buy <span class="price">$150</span></button>
-            </div>
+            <div class="shop-item"><span>Cyber Skin</span><button class="btn" style="padding:10px 20px; font-size:14px" onclick="buyItem('char_neon', 300)">$300</button></div>
         </div>
-
-        <button class="btn" style="background:#22c55e; font-size: 30px; margin-top: 20px;" onclick="startGame()">START RUN</button>
+        <button class="btn" style="margin-top: 30px;" onclick="startGame()">LAUNCH RUN</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // --- PERSISTENT SAVE SYSTEM WITH $500 START ---
-        if (!localStorage.getItem('subway_initialized')) {
-            localStorage.setItem('subway_bank', 500);
-            localStorage.setItem('subway_initialized', true);
-        }
-
+        // --- SAVE SYSTEM ---
+        if (!localStorage.getItem('subway_init')) { localStorage.setItem('subway_bank', 500); localStorage.setItem('subway_init', true); }
         let bank = parseInt(localStorage.getItem('subway_bank')) || 0;
         let unlocked = JSON.parse(localStorage.getItem('subway_unlocks')) || ['default'];
-        
-        function updateUI() {
-            document.getElementById('bank-total').innerText = bank;
-        }
-        updateUI();
+        document.getElementById('bank-total').innerText = bank;
 
         function buyItem(id, price) {
-            if (unlocked.includes(id)) {
-                alert("Already owned!");
-                return;
-            }
-            if (bank >= price) {
-                bank -= price;
-                unlocked.push(id);
+            if (bank >= price && !unlocked.includes(id)) {
+                bank -= price; unlocked.push(id);
                 localStorage.setItem('subway_bank', bank);
                 localStorage.setItem('subway_unlocks', JSON.stringify(unlocked));
-                updateUI();
-                alert("Purchased and Equipped!");
-                location.reload(); // Reload to apply character skin
-            } else {
-                alert("Need more coins!");
+                location.reload();
             }
         }
 
-        // --- GAME ENGINE ---
+        // --- ENGINE ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x60a5fa, 20, 150);
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const sun = new THREE.DirectionalLight(0xffffff, 1);
-        sun.position.set(5, 20, 10);
-        scene.add(sun);
+        // Lighting
+        const mainLight = new THREE.PointLight(0x00ffcc, 1, 100);
+        mainLight.position.set(0, 10, 5);
+        scene.add(mainLight);
+        scene.add(new THREE.AmbientLight(0x404040, 0.5));
 
-        let currentLane = 0;
-        const laneWidth = 3.5;
-        let vy = 0, isGrounded = true, isSliding = false;
-        let coinsCollected = 0, gameRunning = false, speed = 0.5;
-        let activePowerup = null;
+        let gameRunning = false, speed = 0.6, coinsCollected = 0;
+        let currentLane = 0, vy = 0, isGrounded = true, isSliding = false;
 
-        // Player Character Customization
+        // Player & Guard
         const player = new THREE.Group();
-        let pColor = 0x3b82f6; // Default Blue
-        if (unlocked.includes('char_gold')) pColor = 0xffd700;
-        else if (unlocked.includes('char_purple')) pColor = 0x9333ea;
-
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.5), new THREE.MeshStandardMaterial({color: pColor}));
-        body.position.y = 1.1;
-        player.add(body);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-        head.position.y = 1.9;
-        player.add(head);
+        const pMat = new THREE.MeshStandardMaterial({color: unlocked.includes('char_neon') ? 0x00ffcc : 0xffffff});
+        const pBody = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.5), pMat);
+        pBody.position.y = 1; player.add(pBody);
         scene.add(player);
+
+        const guard = new THREE.Group();
+        const gBody = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.6), new THREE.MeshStandardMaterial({color: 0x0000ff}));
+        const gHat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), new THREE.MeshStandardMaterial({color: 0x111}));
+        gHat.position.y = 1.6; guard.add(gBody, gHat);
+        guard.position.z = 5; // Guard stays behind you
+        scene.add(guard);
 
         const obstacles = [], coins = [], scenery = [], powerups = [];
 
-        function createScenery(z) {
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(35, 100), new THREE.MeshStandardMaterial({color: 0x334155}));
+        function createSector(z) {
+            // Floor with Neon Lines
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 100), new THREE.MeshStandardMaterial({color: 0x050505}));
             floor.rotation.x = -Math.PI/2; floor.position.z = z; scene.add(floor); scenery.push(floor);
-            
-            const b1 = new THREE.Mesh(new THREE.BoxGeometry(10, 30, 80), new THREE.MeshStandardMaterial({color: 0x475569}));
-            b1.position.set(-22, 15, z); scene.add(b1); scenery.push(b1);
-            
-            const b2 = new THREE.Mesh(new THREE.BoxGeometry(10, 30, 80), new THREE.MeshStandardMaterial({color: 0x475569}));
-            b2.position.set(22, 15, z); scene.add(b2); scenery.push(b2);
+
+            // Buildings with Glowing Windows
+            for(let i=-1; i<=1; i+=2) {
+                const b = new THREE.Mesh(new THREE.BoxGeometry(10, 40, 90), new THREE.MeshStandardMaterial({color: 0x111111}));
+                b.position.set(i*20, 20, z);
+                // Windows
+                const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.5), new THREE.MeshBasicMaterial({color: 0xffff00}));
+                win.position.set(i*14.9, Math.random()*30, z + (Math.random()-0.5)*50);
+                scene.add(b, win); scenery.push(b, win);
+            }
         }
 
-        function spawnRow(z) {
-            const lane = Math.floor(Math.random() * 3) - 1;
+        function spawnItems(z) {
+            const lane = Math.floor(Math.random()*3)-1;
+            const lX = lane * 3.5;
             
-            // Powerups
-            if (Math.random() < 0.05) {
-                const pu = new THREE.Mesh(new THREE.SphereGeometry(0.6), new THREE.MeshStandardMaterial({color: 0x4ade80, emissive: 0x22c55e}));
-                pu.position.set(lane * laneWidth, 1.5, z);
-                pu.userData = { type: 'magnet' };
-                scene.add(pu);
-                powerups.push(pu);
-            }
+            // Gem (Coin)
+            const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.4), new THREE.MeshBasicMaterial({color: 0x00ffcc}));
+            gem.position.set(lX, 1.2, z); scene.add(gem); coins.push(gem);
 
-            // Obstacles
-            const isTrain = Math.random() < 0.35;
+            // Obstacle
+            const isHigh = Math.random() > 0.5;
             const obs = new THREE.Mesh(
-                isTrain ? new THREE.BoxGeometry(3.2, 4.5, 15) : new THREE.BoxGeometry(3.2, 1.2, 0.6),
-                new THREE.MeshStandardMaterial({color: isTrain ? 0xef4444 : 0xf97316})
+                new THREE.BoxGeometry(3, isHigh ? 1 : 2, 0.5), 
+                new THREE.MeshStandardMaterial({color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5})
             );
-            obs.position.set(lane * laneWidth, isTrain ? 2.25 : 2.5, z);
-            scene.add(obs);
-            obstacles.push(obs);
-
-            // Coins
-            for(let i=0; i<4; i++) {
-                const c = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.15), new THREE.MeshStandardMaterial({color: 0xfacc15}));
-                c.rotation.x = Math.PI/2;
-                c.position.set(lane * laneWidth, 1.2, z - (i*4));
-                scene.add(c);
-                coins.push(c);
-            }
+            obs.position.set(lX, isHigh ? 2.8 : 1, z - 20);
+            scene.add(obs); obstacles.push(obs);
         }
 
-        for(let i=0; i<6; i++) { createScenery(-i * 100); spawnRow(-60 - (i * 45)); }
+        for(let i=0; i<6; i++) { createSector(-i*100); spawnItems(-60 - (i*50)); }
 
-        function startGame() { 
-            document.getElementById('menu').style.display = 'none'; 
-            gameRunning = true; 
-        }
+        function startGame() { document.getElementById('menu').style.display='none'; gameRunning=true; }
 
         window.addEventListener('keydown', (e) => {
-            if (!gameRunning) return;
+            if(!gameRunning) return;
             const k = e.key.toLowerCase();
-            if (k === 'a' && currentLane > -1) currentLane--;
-            if (k === 'd' && currentLane < 1) currentLane++;
-            if (k === ' ' && isGrounded) { vy = 0.38; isGrounded = false; }
-            if (k === 's' && isGrounded) {
-                isSliding = true; player.scale.y = 0.4; player.position.y = -0.3;
-                setTimeout(() => { isSliding = false; player.scale.y = 1; player.position.y = 0; }, 800);
+            if(k === 'a' && currentLane > -1) currentLane--;
+            if(k === 'd' && currentLane < 1) currentLane++;
+            if(k === ' ' && isGrounded) { vy = 0.35; isGrounded = false; }
+            if(k === 's' && isGrounded) {
+                isSliding = true; player.scale.y = 0.4;
+                setTimeout(() => { isSliding = false; player.scale.y = 1; }, 700);
             }
         });
 
-        camera.position.set(0, 7, 12);
-        camera.lookAt(0, 2, 0);
-
         function animate() {
             requestAnimationFrame(animate);
-            if (gameRunning) {
-                speed += 0.00008;
-                player.position.x += (currentLane * laneWidth - player.position.x) * 0.25;
+            if(gameRunning) {
+                speed += 0.0001;
+                // Sky Color Cycle
+                const time = Date.now() * 0.001;
+                scene.background = new THREE.Color(`hsl(${(time * 10) % 360}, 50%, 5%)`);
+
+                // Smooth Movement
+                player.position.x += (currentLane * 3.5 - player.position.x) * 0.2;
                 player.position.y += vy;
-                if (!isGrounded) { vy -= 0.018; if (player.position.y <= 0) { player.position.y = 0; vy = 0; isGrounded = true; } }
+                if(!isGrounded) { vy -= 0.018; if(player.position.y <= 0) { player.position.y = 0; vy = 0; isGrounded = true; } }
 
-                [...obstacles, ...coins, ...scenery, ...powerups].forEach(obj => obj.position.z += speed);
+                // Guard Logic: Gets closer if you play perfectly, but stays back
+                guard.position.x += (player.position.x - guard.position.x) * 0.1;
+                guard.position.z = 6 + Math.sin(time*2);
 
-                scenery.forEach(obj => { 
-                    if (obj.position.z > 100) { 
-                        obj.position.z -= 600; 
-                        if(obj.geometry.type === "PlaneGeometry") spawnRow(obj.position.z); 
-                    } 
-                });
+                [...obstacles, ...coins, ...scenery].forEach(o => o.position.z += speed);
 
-                powerups.forEach((pu, i) => {
-                    if (player.position.distanceTo(pu.position) < 1.8) {
-                        activePowerup = 'MAGNET';
-                        const duration = unlocked.includes('up_mag') ? 10000 : 5000;
-                        document.getElementById('powerup-ui').innerText = "MAGNET ON!";
-                        scene.remove(pu); powerups.splice(i, 1);
-                        setTimeout(() => { activePowerup = null; document.getElementById('powerup-ui').innerText = ""; }, duration);
-                    }
-                });
-
+                // Coin Spin & Collection
                 coins.forEach((c, i) => {
-                    if (activePowerup === 'MAGNET' && c.position.z < 25) {
-                        c.position.lerp(player.position, 0.15);
-                    }
-                    if (player.position.distanceTo(c.position) < 1.6) {
-                        scene.remove(c); coins.splice(i, 1);
-                        coinsCollected += 1; document.getElementById('coin-count').innerText = coinsCollected;
+                    c.rotation.y += 0.1;
+                    if(player.position.distanceTo(c.position) < 1.5) {
+                        scene.remove(c); coins.splice(i,1); coinsCollected++;
+                        document.getElementById('coin-count').innerText = coinsCollected;
                     }
                 });
 
-                obstacles.forEach(obs => {
-                    const pBox = new THREE.Box3().setFromObject(player);
-                    const oBox = new THREE.Box3().setFromObject(obs);
-                    if (pBox.intersectsBox(oBox)) {
-                        gameRunning = false;
-                        bank += coinsCollected;
+                // Obstacle Hit
+                obstacles.forEach(o => {
+                    if(new THREE.Box3().setFromObject(player).intersectsBox(new THREE.Box3().setFromObject(o))) {
+                        gameRunning = false; bank += coinsCollected;
                         localStorage.setItem('subway_bank', bank);
-                        alert("CRASHED! You banked $" + coinsCollected);
-                        location.reload();
+                        alert("CAUGHT! Banked: $" + coinsCollected); location.reload();
                     }
                 });
+
+                // Recycling
+                scenery.forEach(s => { if(s.position.z > 100) { s.position.z -= 600; if(s.geometry.type === "PlaneGeometry") spawnItems(s.position.z); }});
             }
             renderer.render(scene, camera);
         }
